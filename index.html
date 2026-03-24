@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Fakturační Systém Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --dark: #0f172a;
+            --bg: #f1f5f9;
+            --border: #e2e8f0;
+            --success: #059669;
+        }
+
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); margin: 0; padding: 40px 20px; color: var(--dark); }
+
+        /* --- DASHBOARD UI --- */
+        .admin-wrap { max-width: 1100px; margin: 0 auto 50px; }
+        .card { background: white; border-radius: 16px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 25px; }
+        .card h3 { margin: 0 0 20px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); border-bottom: 1px solid var(--bg); padding-bottom: 10px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        
+        .form-group { margin-bottom: 15px; position: relative; }
+        label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 6px; display: block; }
+        input, select { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; box-sizing: border-box; transition: 0.2s; }
+        input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+        .autocomplete-results {
+            position: absolute; z-index: 100; background: white; width: 100%; 
+            border: 1px solid var(--border); border-radius: 0 0 8px 8px; max-height: 200px; overflow-y: auto; box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+        }
+        .result-item { padding: 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--bg); }
+        .result-item:hover { background: #f1f5f9; }
+
+        .item-row { display: grid; grid-template-columns: 4fr 1fr 1fr 1fr 45px; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .btn-add { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; }
+        .btn-del { background: #fee2e2; color: #ef4444; border: none; height: 38px; border-radius: 8px; cursor: pointer; width: 100%; }
+
+        .btn-download { width: 100%; padding: 25px; background: var(--success); color: white; border: none; border-radius: 12px; font-size: 20px; font-weight: 800; cursor: pointer; margin-top: 20px; box-shadow: 0 10px 15px rgba(5, 150, 105, 0.2); }
+
+        /* --- DESIGN FAKTURY --- */
+        .invoice-preview-container { display: flex; justify-content: center; padding-bottom: 100px; }
+
+        #invoice-render {
+            width: 210mm; min-height: 296mm; background: white; padding: 25mm; box-sizing: border-box;
+            color: #000; display: flex; flex-direction: column; box-shadow: 0 0 40px rgba(0,0,0,0.1);
+        }
+
+        .inv-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 60px; }
+        .inv-logo h1 { margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -1px; color: #000; }
+        .inv-type-box { text-align: right; }
+        .inv-type-box h2 { margin: 0; font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        .inv-type-box .no { font-size: 32px; font-weight: 900; }
+
+        .addr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 60px; }
+        .addr-label { font-size: 11px; font-weight: 900; text-transform: uppercase; color: #94a3b8; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; margin-bottom: 15px; display: block; }
+        .addr-box strong { font-size: 18px; font-weight: 800; display: block; margin-bottom: 10px; }
+        .addr-box p { margin: 2px 0; font-size: 15px; color: #1e293b; line-height: 1.5; }
+
+        .strip { display: grid; grid-template-columns: repeat(4, 1fr); background: #f8fafc; padding: 20px 30px; border-radius: 12px; margin-bottom: 60px; }
+        .strip-item span { display: block; font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 6px; }
+        .strip-item strong { font-size: 15px; font-weight: 700; color: #0f172a; }
+        .strip-item .accent { color: var(--primary); }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 60px; }
+        th { text-align: left; padding: 15px 10px; border-bottom: 2px solid #000; font-size: 12px; text-transform: uppercase; font-weight: 900; }
+        td { padding: 20px 10px; border-bottom: 1px solid #f1f5f9; font-size: 16px; color: #1e293b; }
+
+        .inv-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; }
+        .total-price { font-size: 54px; font-weight: 900; letter-spacing: -2px; margin-top: 5px; color: #000; }
+        .tax-summary { font-size: 14px; color: #64748b; font-weight: 600; margin-bottom: 10px; text-align: right; }
+
+        .hidden { display: none !important; }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .admin-wrap { display: none; }
+            #invoice-render { box-shadow: none; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="admin-wrap">
+        <div class="grid-2">
+            <div class="card">
+                <h3>🏢 Dodavatel (Vy)</h3>
+                <div class="form-group">
+                    <label>Hledat v ARES</label>
+                    <input type="text" id="v_search" placeholder="Název / IČO..." oninput="searchAres(this, 'v')">
+                    <div id="v_results" class="autocomplete-results"></div>
+                </div>
+                <div class="form-group"><label>Název</label><input type="text" id="v_name" placeholder="Vaše firma s.r.o." oninput="update()"></div>
+                <div class="grid-2">
+                    <div class="form-group"><label>IČO</label><input type="text" id="v_ico" oninput="update()"></div>
+                    <div class="form-group"><label>DIČ (Nechte prázdné, pokud nejste plátce)</label><input type="text" id="v_dic" oninput="update()"></div>
+                </div>
+                <div class="form-group"><label>Adresa</label><input type="text" id="v_addr" oninput="update()"></div>
+            </div>
+
+            <div class="card">
+                <h3>👤 Odběratel</h3>
+                <div class="form-group">
+                    <label>Hledat v ARES</label>
+                    <input type="text" id="z_search" placeholder="Název / IČO..." oninput="searchAres(this, 'z')">
+                    <div id="z_results" class="autocomplete-results"></div>
+                </div>
+                <div class="form-group"><label>Název</label><input type="text" id="z_name" placeholder="Klient s.r.o." oninput="update()"></div>
+                <div class="grid-2">
+                    <div class="form-group"><label>IČO</label><input type="text" id="z_ico" oninput="update()"></div>
+                    <div class="form-group"><label>DIČ</label><input type="text" id="z_dic" oninput="update()"></div>
+                </div>
+                <div class="form-group"><label>Adresa</label><input type="text" id="z_addr" oninput="update()"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>💳 Platební údaje</h3>
+            <div class="grid-3">
+                <div class="form-group">
+                    <label>Typ dokladu</label>
+                    <select id="in_type" onchange="update()">
+                        <option value="Faktura">Faktura (Neplátce)</option>
+                        <option value="Faktura - daňový doklad">Faktura s DPH (21 %)</option>
+                        <option value="Zálohová faktura">Zálohová faktura</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Číslo faktury</label><input type="text" id="in_no" value="2026001" oninput="update()"></div>
+                <div class="form-group"><label>Číslo účtu</label><input type="text" id="in_acc" value="123456789/0100" oninput="update()"></div>
+                <div class="form-group"><label>Splatnost (dny)</label><input type="number" id="in_days" value="7" oninput="update()"></div>
+                <div class="form-group"><label>Měna</label><input type="text" id="in_curr" value="Kč" oninput="update()"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📦 Položky faktury</h3>
+            <div id="items_root"></div>
+            <button class="btn-add" onclick="addItem()">+ Přidat řádek</button>
+        </div>
+
+        <button class="btn-download" onclick="downloadPDF()">STÁHNOUT PDF FAKTURU</button>
+    </div>
+
+    <div class="invoice-preview-container">
+        <div id="invoice-render">
+            <div class="inv-header">
+                <div class="inv-logo"><h1 id="out_v_logo">Vaše Firma</h1></div>
+                <div class="inv-type-box">
+                    <h2 id="out_type_label">FAKTURA</h2>
+                    <div class="no">#<span id="out_no">2026001</span></div>
+                </div>
+            </div>
+
+            <div class="addr-grid">
+                <div class="addr-box">
+                    <span class="addr-label">Dodavatel</span>
+                    <strong id="out_v_name">---</strong>
+                    <p id="out_v_addr">---</p>
+                    <p id="row_v_ico">IČ: <span id="out_v_ico">---</span></p>
+                    <p id="row_v_dic" class="hidden">DIČ: <span id="out_v_dic"></span></p>
+                </div>
+                <div class="addr-box">
+                    <span class="addr-label">Odběratel</span>
+                    <strong id="out_z_name">---</strong>
+                    <p id="out_z_addr">---</p>
+                    <p id="row_z_ico">IČ: <span id="out_z_ico">---</span></p>
+                    <p id="row_z_dic" class="hidden">DIČ: <span id="out_z_dic"></span></p>
+                </div>
+            </div>
+
+            <div class="strip">
+                <div class="strip-item"><span>Vystaveno</span><strong id="out_d_v">---</strong></div>
+                <div class="strip-item"><span>Splatnost</span><strong id="out_d_s" class="accent">---</strong></div>
+                <div class="strip-item"><span>Číslo účtu</span><strong id="out_acc">---</strong></div>
+                <div class="strip-item"><span>Var. symbol</span><strong id="out_vs">---</strong></div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr><th>Popis</th><th style="text-align:right">Množství</th><th style="text-align:right">Cena/j</th><th style="text-align:right">Celkem</th></tr>
+                </thead>
+                <tbody id="out_table"></tbody>
+            </table>
+
+            <div class="inv-footer">
+                <div id="qr_box">
+                    <img id="out_qr" src="" width="130">
+                    <div style="font-size:9px; font-weight:900; margin-top:5px; text-align:center">QR PLATBA</div>
+                </div>
+                <div style="text-align:right">
+                    <div id="out_tax" class="tax-summary"></div>
+                    <div style="font-size:12px; font-weight:900; text-transform:uppercase; color:var(--primary)">Celkem k úhradě</div>
+                    <div class="total-price"><span id="out_final">0</span> <span class="curr">Kč</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rows = [];
+        const today = new Date();
+
+        async function searchAres(el, type) {
+            const val = el.value;
+            const resDiv = document.getElementById(`${type}_results`);
+            if(val.length < 3) { resDiv.innerHTML = ''; return; }
+            try {
+                const resp = await fetch('https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ obchodniJmeno: val, pocet: 5 })
+                });
+                const data = await resp.json();
+                resDiv.innerHTML = '';
+                data.ekonomickeSubjekty.forEach(s => {
+                    const d = document.createElement('div');
+                    d.className = 'result-item';
+                    d.innerHTML = `<strong>${s.obchodniJmeno}</strong> (${s.ico})`;
+                    d.onclick = () => {
+                        document.getElementById(`${type}_name`).value = s.obchodniJmeno;
+                        document.getElementById(`${type}_ico`).value = s.ico;
+                        document.getElementById(`${type}_dic`).value = s.dic || '';
+                        document.getElementById(`${type}_addr`).value = s.sidlo.textovaAdresa;
+                        resDiv.innerHTML = '';
+                        update();
+                    };
+                    resDiv.appendChild(d);
+                });
+            } catch(e) {}
+        }
+
+        function addItem() {
+            const id = Date.now();
+            const root = document.getElementById('items_root');
+            const div = document.createElement('div');
+            div.className = 'item-row';
+            div.id = `r-${id}`;
+            div.innerHTML = `
+                <input type="text" placeholder="Popis práce nebo zboží" oninput="editRow(${id}, 'desc', this.value)">
+                <input type="number" value="1" oninput="editRow(${id}, 'qty', this.value)">
+                <input type="text" value="ks" oninput="editRow(${id}, 'unit', this.value)">
+                <input type="number" placeholder="Cena" oninput="editRow(${id}, 'price', this.value)">
+                <button class="btn-del" onclick="delRow(${id})">✕</button>
+            `;
+            root.appendChild(div);
+            rows.push({id, desc: '', qty: 1, unit: 'ks', price: 0});
+            update();
+        }
+
+        function delRow(id) {
+            document.getElementById(`r-${id}`).remove();
+            rows = rows.filter(r => r.id !== id);
+            update();
+        }
+
+        function editRow(id, f, v) {
+            const r = rows.find(x => x.id === id);
+            r[f] = v;
+            update();
+        }
+
+        function update() {
+            const fields = [
+                {in: 'v_name', out: 'out_v_name', box: 'out_v_logo'},
+                {in: 'v_addr', out: 'out_v_addr'},
+                {in: 'v_ico', out: 'out_v_ico', row: 'row_v_ico'},
+                {in: 'v_dic', out: 'out_v_dic', row: 'row_v_dic'},
+                {in: 'z_name', out: 'out_z_name'},
+                {in: 'z_addr', out: 'out_z_addr'},
+                {in: 'z_ico', out: 'out_z_ico', row: 'row_z_ico'},
+                {in: 'z_dic', out: 'out_z_dic', row: 'row_z_dic'}
+            ];
+
+            fields.forEach(f => {
+                const val = document.getElementById(f.in).value;
+                const out = document.getElementById(f.out);
+                const parent = f.row ? document.getElementById(f.row) : out;
+                
+                if(!val || val.trim() === "") {
+                    if (f.in.includes('dic')) {
+                        parent.classList.add('hidden');
+                    } else {
+                        out.innerText = "---";
+                    }
+                } else {
+                    parent.classList.remove('hidden');
+                    out.innerText = val;
+                    if(f.box) document.getElementById(f.box).innerText = val;
+                }
+            });
+
+            const invNo = document.getElementById('in_no').value || '---';
+            document.getElementById('out_no').innerText = invNo;
+            document.getElementById('out_vs').innerText = invNo;
+            document.getElementById('out_acc').innerText = document.getElementById('in_acc').value || '---';
+            document.getElementById('out_type_label').innerText = document.getElementById('in_type').value.toUpperCase();
+
+            const fmt = (d) => d.toLocaleDateString('cs-CZ');
+            document.getElementById('out_d_v').innerText = fmt(today);
+            const due = new Date();
+            due.setDate(today.getDate() + parseInt(document.getElementById('in_days').value || 0));
+            document.getElementById('out_d_s').innerText = fmt(due);
+
+            const tbody = document.getElementById('out_table');
+            tbody.innerHTML = '';
+            let sub = 0;
+            rows.forEach(r => {
+                const t = (r.qty || 0) * (r.price || 0);
+                sub += t;
+                if(r.desc) {
+                    tbody.innerHTML += `<tr><td>${r.desc}</td><td align="right">${r.qty} ${r.unit}</td><td align="right">${Number(r.price).toLocaleString('cs-CZ')}</td><td align="right"><strong>${t.toLocaleString('cs-CZ')}</strong></td></tr>`;
+                }
+            });
+
+            const isDph = document.getElementById('in_type').value.includes('DPH');
+            const curr = document.getElementById('in_curr').value;
+            let final = sub;
+            
+            if(isDph) {
+                const tax = sub * 0.21;
+                final = sub + tax;
+                document.getElementById('out_tax').innerHTML = `Základ: ${sub.toLocaleString('cs-CZ')} ${curr}<br>DPH (21 %): ${tax.toLocaleString('cs-CZ')} ${curr}`;
+            } else {
+                document.getElementById('out_tax').innerText = '';
+            }
+
+            document.getElementById('out_final').innerText = final.toLocaleString('cs-CZ', {minimumFractionDigits: 2});
+            document.querySelectorAll('.curr').forEach(e => e.innerText = curr);
+
+            const acc = document.getElementById('in_acc').value.replace(/\s/g, '').replace('/', '');
+            if(acc && final > 0) {
+                document.getElementById('qr_box').classList.remove('hidden');
+                document.getElementById('out_qr').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=SPD*1.0*ACC:${acc}*AM:${final.toFixed(2)}*CC:CZK*VS:${invNo}`;
+            } else {
+                document.getElementById('qr_box').classList.add('hidden');
+            }
+        }
+
+        function downloadPDF() {
+            const element = document.getElementById('invoice-render');
+            const invNo = document.getElementById('in_no').value || 'faktura';
+            const opt = {
+                margin: 0,
+                filename: 'faktura_' + invNo + '.pdf',
+                image: { type: 'jpeg', quality: 1 },
+                html2canvas: { scale: 3, useCORS: true, scrollY: 0 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+
+        addItem();
+        update();
+    </script>
+</body>
+</html>
