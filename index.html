@@ -71,7 +71,7 @@
 
         .inv-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; }
         .total-price { font-size: 54px; font-weight: 900; letter-spacing: -2px; margin-top: 5px; color: #000; }
-        .tax-summary { font-size: 14px; color: #64748b; font-weight: 600; margin-bottom: 10px; text-align: right; }
+        .tax-summary { font-size: 14px; color: #64748b; font-weight: 600; margin-bottom: 10px; text-align: right; line-height: 1.6;}
 
         .hidden { display: none !important; }
 
@@ -93,10 +93,10 @@
                     <input type="text" id="v_search" placeholder="Název / IČO..." oninput="searchAres(this, 'v')">
                     <div id="v_results" class="autocomplete-results"></div>
                 </div>
-                <div class="form-group"><label>Název</label><input type="text" id="v_name" placeholder="Vaše firma s.r.o." oninput="update()"></div>
+                <div class="form-group"><label>Název / Jméno</label><input type="text" id="v_name" placeholder="Vaše firma s.r.o." oninput="update()"></div>
                 <div class="grid-2">
-                    <div class="form-group"><label>IČO</label><input type="text" id="v_ico" oninput="update()"></div>
-                    <div class="form-group"><label>DIČ (Nechte prázdné, pokud nejste plátce)</label><input type="text" id="v_dic" oninput="update()"></div>
+                    <div class="form-group"><label>IČO (pro FO nechte prázdné)</label><input type="text" id="v_ico" oninput="update()"></div>
+                    <div class="form-group"><label>DIČ (Plátce DPH)</label><input type="text" id="v_dic" oninput="update()"></div>
                 </div>
                 <div class="form-group"><label>Adresa</label><input type="text" id="v_addr" oninput="update()"></div>
             </div>
@@ -108,9 +108,9 @@
                     <input type="text" id="z_search" placeholder="Název / IČO..." oninput="searchAres(this, 'z')">
                     <div id="z_results" class="autocomplete-results"></div>
                 </div>
-                <div class="form-group"><label>Název</label><input type="text" id="z_name" placeholder="Klient s.r.o." oninput="update()"></div>
+                <div class="form-group"><label>Název / Jméno</label><input type="text" id="z_name" placeholder="Klient s.r.o. / Jan Novák" oninput="update()"></div>
                 <div class="grid-2">
-                    <div class="form-group"><label>IČO</label><input type="text" id="z_ico" oninput="update()"></div>
+                    <div class="form-group"><label>IČO (pro FO nechte prázdné)</label><input type="text" id="z_ico" oninput="update()"></div>
                     <div class="form-group"><label>DIČ</label><input type="text" id="z_dic" oninput="update()"></div>
                 </div>
                 <div class="form-group"><label>Adresa</label><input type="text" id="z_addr" oninput="update()"></div>
@@ -118,14 +118,14 @@
         </div>
 
         <div class="card">
-            <h3>💳 Platební údaje</h3>
+            <h3>💳 Platební údaje & Daně</h3>
             <div class="grid-3">
                 <div class="form-group">
-                    <label>Typ dokladu</label>
-                    <select id="in_type" onchange="update()">
-                        <option value="Faktura">Faktura (Neplátce)</option>
-                        <option value="Faktura - daňový doklad">Faktura s DPH (21 %)</option>
-                        <option value="Zálohová faktura">Zálohová faktura</option>
+                    <label>DPH Režim</label>
+                    <select id="tax_mode" onchange="update()">
+                        <option value="none">Nejsem plátce DPH</option>
+                        <option value="plus">Ceny jsou BEZ DPH (+21% přičíst)</option>
+                        <option value="include">Ceny jsou VČETNĚ DPH (vypočítat)</option>
                     </select>
                 </div>
                 <div class="form-group"><label>Číslo faktury</label><input type="text" id="in_no" value="2026001" oninput="update()"></div>
@@ -262,40 +262,34 @@
         }
 
         function update() {
-            const fields = [
-                {in: 'v_name', out: 'out_v_name', box: 'out_v_logo'},
-                {in: 'v_addr', out: 'out_v_addr'},
-                {in: 'v_ico', out: 'out_v_ico', row: 'row_v_ico'},
-                {in: 'v_dic', out: 'out_v_dic', row: 'row_v_dic'},
-                {in: 'z_name', out: 'out_z_name'},
-                {in: 'z_addr', out: 'out_z_addr'},
-                {in: 'z_ico', out: 'out_z_ico', row: 'row_z_ico'},
-                {in: 'z_dic', out: 'out_z_dic', row: 'row_z_dic'}
-            ];
+            // Validace dodavatele a odběratele
+            const checkFields = ['v', 'z'];
+            checkFields.forEach(prefix => {
+                const name = document.getElementById(`${prefix}_name`).value;
+                const ico = document.getElementById(`${prefix}_ico`).value;
+                const dic = document.getElementById(`${prefix}_dic`).value;
+                const addr = document.getElementById(`${prefix}_addr`).value;
 
-            fields.forEach(f => {
-                const val = document.getElementById(f.in).value;
-                const out = document.getElementById(f.out);
-                const parent = f.row ? document.getElementById(f.row) : out;
+                document.getElementById(`out_${prefix}_name`).innerText = name || "---";
+                document.getElementById(`out_${prefix}_addr`).innerText = addr || "---";
                 
-                if(!val || val.trim() === "") {
-                    if (f.in.includes('dic')) {
-                        parent.classList.add('hidden');
-                    } else {
-                        out.innerText = "---";
-                    }
-                } else {
-                    parent.classList.remove('hidden');
-                    out.innerText = val;
-                    if(f.box) document.getElementById(f.box).innerText = val;
-                }
+                // Skrytí IČO/DIČ pokud jsou prázdné
+                const icoRow = document.getElementById(`row_${prefix}_ico`);
+                if(!ico) { icoRow.classList.add('hidden'); } 
+                else { icoRow.classList.remove('hidden'); document.getElementById(`out_${prefix}_ico`).innerText = ico; }
+
+                const dicRow = document.getElementById(`row_${prefix}_dic`);
+                if(!dic) { dicRow.classList.add('hidden'); } 
+                else { dicRow.classList.remove('hidden'); document.getElementById(`out_${prefix}_dic`).innerText = dic; }
+                
+                if(prefix === 'v') document.getElementById('out_v_logo').innerText = name || "Vaše Firma";
             });
 
+            // Číslo faktury a data
             const invNo = document.getElementById('in_no').value || '---';
             document.getElementById('out_no').innerText = invNo;
             document.getElementById('out_vs').innerText = invNo;
             document.getElementById('out_acc').innerText = document.getElementById('in_acc').value || '---';
-            document.getElementById('out_type_label').innerText = document.getElementById('in_type').value.toUpperCase();
 
             const fmt = (d) => d.toLocaleDateString('cs-CZ');
             document.getElementById('out_d_v').innerText = fmt(today);
@@ -303,36 +297,60 @@
             due.setDate(today.getDate() + parseInt(document.getElementById('in_days').value || 0));
             document.getElementById('out_d_s').innerText = fmt(due);
 
+            // Výpočet položek a daní
             const tbody = document.getElementById('out_table');
+            const taxMode = document.getElementById('tax_mode').value;
+            const curr = document.getElementById('in_curr').value;
             tbody.innerHTML = '';
-            let sub = 0;
+            
+            let totalBase = 0;
+            let totalVat = 0;
+            let totalFinal = 0;
+
             rows.forEach(r => {
-                const t = (r.qty || 0) * (r.price || 0);
-                sub += t;
-                if(r.desc) {
-                    tbody.innerHTML += `<tr><td>${r.desc}</td><td align="right">${r.qty} ${r.unit}</td><td align="right">${Number(r.price).toLocaleString('cs-CZ')}</td><td align="right"><strong>${t.toLocaleString('cs-CZ')}</strong></td></tr>`;
+                const qty = parseFloat(r.qty) || 0;
+                const price = parseFloat(r.price) || 0;
+                let lineTotal = qty * price;
+                
+                if (r.desc) {
+                    tbody.innerHTML += `<tr>
+                        <td>${r.desc}</td>
+                        <td align="right">${qty} ${r.unit}</td>
+                        <td align="right">${price.toLocaleString('cs-CZ')}</td>
+                        <td align="right"><strong>${lineTotal.toLocaleString('cs-CZ')}</strong></td>
+                    </tr>`;
                 }
+                totalBase += lineTotal;
             });
 
-            const isDph = document.getElementById('in_type').value.includes('DPH');
-            const curr = document.getElementById('in_curr').value;
-            let final = sub;
-            
-            if(isDph) {
-                const tax = sub * 0.21;
-                final = sub + tax;
-                document.getElementById('out_tax').innerHTML = `Základ: ${sub.toLocaleString('cs-CZ')} ${curr}<br>DPH (21 %): ${tax.toLocaleString('cs-CZ')} ${curr}`;
+            if (taxMode === 'plus') {
+                totalVat = totalBase * 0.21;
+                totalFinal = totalBase + totalVat;
+                document.getElementById('out_tax').innerHTML = `
+                    Základ daně: ${totalBase.toLocaleString('cs-CZ')} ${curr}<br>
+                    DPH (21 %): ${totalVat.toLocaleString('cs-CZ')} ${curr}
+                `;
+            } else if (taxMode === 'include') {
+                totalFinal = totalBase;
+                totalBase = totalFinal / 1.21;
+                totalVat = totalFinal - totalBase;
+                document.getElementById('out_tax').innerHTML = `
+                    Základ daně: ${totalBase.toLocaleString('cs-CZ', {maximumFractionDigits: 2})} ${curr}<br>
+                    DPH (21 %): ${totalVat.toLocaleString('cs-CZ', {maximumFractionDigits: 2})} ${curr}
+                `;
             } else {
+                totalFinal = totalBase;
                 document.getElementById('out_tax').innerText = '';
             }
 
-            document.getElementById('out_final').innerText = final.toLocaleString('cs-CZ', {minimumFractionDigits: 2});
+            document.getElementById('out_final').innerText = totalFinal.toLocaleString('cs-CZ', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.querySelectorAll('.curr').forEach(e => e.innerText = curr);
 
+            // QR Platba
             const acc = document.getElementById('in_acc').value.replace(/\s/g, '').replace('/', '');
-            if(acc && final > 0) {
+            if(acc && totalFinal > 0) {
                 document.getElementById('qr_box').classList.remove('hidden');
-                document.getElementById('out_qr').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=SPD*1.0*ACC:${acc}*AM:${final.toFixed(2)}*CC:CZK*VS:${invNo}`;
+                document.getElementById('out_qr').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=SPD*1.0*ACC:${acc}*AM:${totalFinal.toFixed(2)}*CC:CZK*VS:${invNo}`;
             } else {
                 document.getElementById('qr_box').classList.add('hidden');
             }
